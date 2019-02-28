@@ -1,10 +1,7 @@
 package elitr.worker;
 
 import java.net.InetAddress;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -12,6 +9,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import cz.cuni.mff.ufal.LindatTranslationClient;
+import cz.cuni.mff.ufal.Translator;
 import it.pervoice.eubridge.mcloud.MCloudDataType;
 import it.pervoice.eubridge.mcloud.MCloudException;
 import it.pervoice.eubridge.mcloud.jni.MCloudPacket;
@@ -33,7 +32,7 @@ public class Worker {
     private MCloudQueue procQueue;
     private MCloudQueue sendQueue;
 
-    public Worker (String name) throws MCloudException {
+    public Worker (String name, String inputFingerprint, String outputFingerprint) throws MCloudException {
         /*
         Without synchronized this odd thing appears:
         This machine has 4available processors.
@@ -46,9 +45,6 @@ public class Worker {
         synchronized (MCloudWorker.class) {
             mWorker = new MCloudWorker(name);
         }
-        //TODO get these from transformer
-        String inputFingerprint = "en";
-        String outputFingerprint = "cs";
         log.info("Adding service: name=" + name + " service=" + serviceType + " inputFP=" + inputFingerprint
                 + " inputType=" + inOutType + " outputFP=" + outputFingerprint + " outputType=" + inOutType);
         mWorker.addService(name, serviceType, inputFingerprint, MCloudDataType.valueOf(inOutType),
@@ -56,7 +52,7 @@ public class Worker {
         procQueue = mWorker.getProcessingQueue();
         sendQueue = mWorker.getSendingQueue();
         log.info("Setting listeners to processing queue and sending queue");
-        ProcessingEventListener manager = new ProcessingEventListener(mWorker, inputFingerprint, outputFingerprint);
+        ProcessingEventListener manager = new ProcessingEventListener(mWorker, outputFingerprint);
         procQueue.addGlobalListener(manager);
         sendQueue.addGlobalListener(new SendingEventListener(manager));
     }
@@ -67,27 +63,35 @@ public class Worker {
 
         String host = Optional.ofNullable(System.getenv("PV_HOST")).orElse(DEFAULT_HOST);
         int port = Integer.valueOf(Optional.ofNullable(System.getenv("PV_PORT")).orElse(DEFAULT_PORT));
-        String nThreadArg = args.length == 1 ? args[0] : "1";
-        int nThreads = Integer.valueOf(nThreadArg);
+        //String nThreadArg = args.length == 1 ? args[0] : "1";
+        //int nThreads = Integer.valueOf(nThreadArg);
 
-        log.info("Using " + nThreads + " threads");
+        //log.info("Using " + nThreads + " threads");
 
-        ExecutorService executorService = Executors.newFixedThreadPool(nThreads);
-        Callable<Void> callable = () -> {
-            Worker worker =
-                    new Worker(String.format("LindatTranslationWorker-%s-%s-%s", InetAddress.getLocalHost().getHostName(),
-                            ProcessHandle.current().pid(), Thread.currentThread().getId()));
-            try{
-                worker.start(host, port);
-            }catch (MCloudException e){
-                log.error("Error during processing. " + e.getMessage());
-            }finally {
-                worker.stop();
-            }
-            return null;
-        };
-        List<Callable<Void>> callables =
-                IntStream.range(0, nThreads).mapToObj(_x -> callable).collect(Collectors.toList());
+        List<Callable<Void>> callables = new LinkedList<>();
+
+        Translator translator = new LindatTranslationClient();
+        for (Map.Entry<String, String> entry : translator.getAvailableLanguagePairs()) {
+            String src = entry.getKey();
+            String tgt = entry.getValue();
+
+            Callable<Void> callable = () -> {
+                String workerName = String.format("LindatTranslationWorker-%s-%s-%s", InetAddress.getLocalHost().getHostName(),
+                                ProcessHandle.current().pid(), Thread.currentThread().getId());
+                Worker worker = new Worker(workerName, src, tgt);
+                try{
+                    worker.start(host, port);
+                }catch (MCloudException e){
+                    log.error("Error during processing. " + e.getMessage());
+                }finally {
+                    worker.stop();
+                }
+                return null;
+            };
+            callables.add(callable);
+        }
+
+        ExecutorService executorService = Executors.newFixedThreadPool(callables.size());
         executorService.invokeAll(callables);
     }
 

@@ -102,7 +102,7 @@ public class Client {
 
     private void sendOnePacket() throws MCloudException {
         MCloudPacket pkt = new MCloudTextPacket(new Date(), new Date(), 0,
-                inputFingerprint, "WORD " + ProcessHandle.current().pid());
+                outputFingerprint, "This is a test sentence with pid " + ProcessHandle.current().pid());
         mClient.sendPacketAsync(pkt);
     }
 

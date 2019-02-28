@@ -52,6 +52,7 @@ public class LindatTranslationClient implements Translator {
     }
 
     public LindatTranslationClient(String apiUrl){
+        System.err.println("Using API_URL=" + apiUrl);
        this.apiUrl =  apiUrl;
        this.client = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.ALWAYS)

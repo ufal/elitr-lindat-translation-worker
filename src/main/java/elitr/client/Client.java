@@ -6,13 +6,14 @@ import it.pervoice.eubridge.mcloud.jni.MCloudClient;
 import it.pervoice.eubridge.mcloud.jni.MCloudPacket;
 import it.pervoice.eubridge.mcloud.jni.MCloudQueue;
 import it.pervoice.eubridge.mcloud.jni.MCloudTextPacket;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Date;
-import java.util.logging.Logger;
 
 public class Client {
 
-    private static Logger log = Logger.getLogger(Client.class.getName());
+    private static Logger log = LoggerFactory.getLogger(Client.class.getName());
 
     private String name;
     private MCloudClient mClient;
@@ -45,7 +46,7 @@ public class Client {
                 mClient.connect(host, port);
                 break;
             } catch (MCloudException e) {
-                log.warning("Error connecting to MCloud. Retrying in a moment... [" + e.getMessage() + "]");
+                log.warn("Error connecting to MCloud. Retrying in a moment... [" + e.getMessage() + "]");
                 try {
                     Thread.currentThread().sleep(2000);
                 } catch (InterruptedException e1) {
@@ -105,24 +106,23 @@ public class Client {
         mClient.sendPacketAsync(pkt);
     }
 
-    //TODO test multiple workers
     public static void main(String[] args) {
         Client client;
         try {
             client = new Client("MockupClient");
         } catch (MCloudException e) {
-            log.severe("Something wrong happened initializing Client" + e.getMessage());
+            log.error("Something wrong happened initializing Client" + e.getMessage());
             return;
         }
         try {
             client.start(mediatorHost, mediatorClientPort);
         } catch (MCloudException e) {
-            log.severe("Something wrong happened during processing" + e.getMessage());
+            log.error("Something wrong happened during processing" + e.getMessage());
         } finally {
             try {
                 client.stop();
             } catch (MCloudException e) {
-                log.severe("Something wrong happened while stopping client" + e.getMessage());
+                log.error("Something wrong happened while stopping client" + e.getMessage());
             }
         }
     }

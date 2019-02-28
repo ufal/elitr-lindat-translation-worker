@@ -1,15 +1,27 @@
 package elitr.worker;
 
+import java.net.InetAddress;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Optional;
-import java.util.logging.Logger;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 import it.pervoice.eubridge.mcloud.MCloudDataType;
 import it.pervoice.eubridge.mcloud.MCloudException;
 import it.pervoice.eubridge.mcloud.jni.MCloudPacket;
 import it.pervoice.eubridge.mcloud.jni.MCloudQueue;
 import it.pervoice.eubridge.mcloud.jni.MCloudWorker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Worker {
-    private static final Logger log  = Logger.getLogger(Worker.class.getName());
+    private static final Logger log  = LoggerFactory.getLogger(Worker.class.getName());
 
     private static final String DEFAULT_HOST = "mediator.pervoice.com";
     private static final String DEFAULT_PORT = "60021";
@@ -22,7 +34,18 @@ public class Worker {
     private MCloudQueue sendQueue;
 
     public Worker (String name) throws MCloudException {
-        mWorker = new MCloudWorker(name);
+        /*
+        Without synchronized this odd thing appears:
+        This machine has 4available processors.
+        [main] INFO elitr.worker.Worker - Using 2 threads
+        JMCloud native library loaded!
+        JMCloud native library loaded!
+        Codec not found!
+        ERROR (src/MCloud.c,2107): Setting audio encoder codec=RPCM samplerate=16000 bitrate=0 channels=1
+         */
+        synchronized (MCloudWorker.class) {
+            mWorker = new MCloudWorker(name);
+        }
         //TODO get these from transformer
         String inputFingerprint = "en";
         String outputFingerprint = "cs";
@@ -39,29 +62,44 @@ public class Worker {
     }
 
 
-    public static void main(String[] args) throws MCloudException {
-        Worker worker = new Worker("LindatTranslationWorker");
+    public static void main(String[] args) throws InterruptedException {
+        System.err.println("This machine has " + Runtime.getRuntime().availableProcessors() + "available processors.");
+
         String host = Optional.ofNullable(System.getenv("PV_HOST")).orElse(DEFAULT_HOST);
         int port = Integer.valueOf(Optional.ofNullable(System.getenv("PV_PORT")).orElse(DEFAULT_PORT));
-        try{
-            worker.start(host, port);
-        }catch (MCloudException e){
-            log.severe("Error during processing. " + e.getMessage());
-        }finally {
-            worker.stop();
-        }
+        String nThreadArg = args.length == 1 ? args[0] : "1";
+        int nThreads = Integer.valueOf(nThreadArg);
+
+        log.info("Using " + nThreads + " threads");
+
+        ExecutorService executorService = Executors.newFixedThreadPool(nThreads);
+        Callable<Void> callable = () -> {
+            Worker worker =
+                    new Worker(String.format("LindatTranslationWorker-%s-%s-%s", InetAddress.getLocalHost().getHostName(),
+                            ProcessHandle.current().pid(), Thread.currentThread().getId()));
+            try{
+                worker.start(host, port);
+            }catch (MCloudException e){
+                log.error("Error during processing. " + e.getMessage());
+            }finally {
+                worker.stop();
+            }
+            return null;
+        };
+        List<Callable<Void>> callables =
+                IntStream.range(0, nThreads).mapToObj(_x -> callable).collect(Collectors.toList());
+        executorService.invokeAll(callables);
     }
 
-    //TODO this in an own thread?
     private void start(String host, int port) throws MCloudException {
 
         connect(host, port);
 
-        while (true) {
+        while (!Thread.interrupted()) {
             log.info("Waiting for clients");
             try {
                 mWorker.waitForClient();
-                log.info("Client request accepted");
+                log.info("Client request accepted ");
             } catch (MCloudException e) {
                 log.info("WaitForClient error... timed out?");
                 connect(host, port);
@@ -70,8 +108,7 @@ public class Worker {
 
             MCloudPacket pkt = null;
             boolean proceed = true;
-            // please notice that if it's a DATA packet getNextPacketOrProcessAsync will
-            // process it
+            // please notice that if it's a DATA packet getNextPacketOrProcessAsync will process it
             while (proceed && ((pkt = mWorker.getNextPacketOrProcessAsync()) != null)) {
                 switch (pkt.getType()) {
                     case STATUS_FLUSH:
@@ -105,7 +142,7 @@ public class Worker {
                         proceed = false;
                         break;
                     default:
-                        log.warning("Received unknown message: " + pkt);
+                        log.warn("Received unknown message: " + pkt);
                         break;
                 }
             }
@@ -113,13 +150,13 @@ public class Worker {
     }
 
     private void connect(String host, int port) {
-        while (true) {
+        while (!Thread.interrupted()) {
             try {
                 log.info("Connecting to MCloud: " + host + ":" + port);
                 mWorker.connect(host, port);
                 break;
             } catch (MCloudException e) {
-                log.warning("Error connecting to MCloud. Retrying in a moment... [" + e.getMessage() + "]");
+                log.warn("Error connecting to MCloud. Retrying in a moment... [" + e.getMessage() + "]");
                 try {
                     Thread.currentThread().sleep(2000);
                 } catch (InterruptedException e1) {
@@ -131,9 +168,9 @@ public class Worker {
     }
 
     private void stop() throws MCloudException {
+        log.error("wtf", new Throwable("wtf"));
         log.info("Stopping worker...");
-        /*proceede = false;
-        stopped = true;*/
         mWorker.disconnect();
+        mWorker = null;
     }
 }

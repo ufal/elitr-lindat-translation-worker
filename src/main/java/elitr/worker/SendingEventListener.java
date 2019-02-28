@@ -2,11 +2,12 @@ package elitr.worker;
 
 import it.pervoice.eubridge.mcloud.MCloudEventListener;
 import it.pervoice.eubridge.mcloud.jni.MCloudQueue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.logging.Logger;
 
 public class SendingEventListener extends MCloudEventListener {
-    private static final Logger log = Logger.getLogger(SendingEventListener.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(SendingEventListener.class.getName());
     private ProcessingEventListener manager;
 
     public SendingEventListener(ProcessingEventListener manager) {

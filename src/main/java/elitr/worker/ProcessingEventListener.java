@@ -8,13 +8,13 @@ import it.pervoice.eubridge.mcloud.jni.MCloudPacket;
 import it.pervoice.eubridge.mcloud.jni.MCloudQueue;
 import it.pervoice.eubridge.mcloud.jni.MCloudTextPacket;
 import it.pervoice.eubridge.mcloud.jni.MCloudWorker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.Date;
-import java.util.logging.Logger;
 
 public class ProcessingEventListener extends MCloudEventListener {
     
-    private static final Logger log = Logger.getLogger(ProcessingEventListener.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(ProcessingEventListener.class.getName());
     private final MCloudWorker worker;
     private final String outputFingerPrint;
     private final String inputFingerPrint;
@@ -25,8 +25,9 @@ public class ProcessingEventListener extends MCloudEventListener {
         this.worker = worker;
         this.outputFingerPrint = outputFingerPrint;
         this.inputFingerPrint = inputFingerPrint;
-        //TODO configurable
-        translator = new LindatTranslationClient("https://lindat.mff.cuni.cz/services/translation/api/v1");
+        //translator = new LindatTranslationClient("https://lindat.mff.cuni.cz/services/translation/api/v1");
+        //This uses $API_URL or localhost:5000
+        translator = new LindatTranslationClient();
     }
     
     @Override
@@ -72,7 +73,7 @@ public class ProcessingEventListener extends MCloudEventListener {
             try {
                 worker.sendPacketAsync(translated);
             } catch (MCloudException e) {
-                log.severe(e.getMessage());
+                log.error(e.getMessage());
                 return false;
             }
         }

@@ -4,11 +4,12 @@ import it.pervoice.eubridge.mcloud.MCloudEventListener;
 import it.pervoice.eubridge.mcloud.jni.MCloudBinaryPacket;
 import it.pervoice.eubridge.mcloud.jni.MCloudPacket;
 import it.pervoice.eubridge.mcloud.jni.MCloudTextPacket;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.logging.Logger;
 
 public class ProcessingEventListener extends MCloudEventListener {
-    private static Logger log = Logger.getLogger(ProcessingEventListener.class.getName());
+    private static Logger log = LoggerFactory.getLogger(ProcessingEventListener.class.getName());
 
     @Override
     /**

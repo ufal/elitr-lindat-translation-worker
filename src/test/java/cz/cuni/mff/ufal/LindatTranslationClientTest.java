@@ -1,16 +1,16 @@
 package cz.cuni.mff.ufal;
 
-import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
 
 public class LindatTranslationClientTest {
 
-    Translator translator;
+    static Translator translator;
 
-    @Before
-    public void beforeInit(){
+    @BeforeClass
+    public static void beforeInit(){
         translator = new LindatTranslationClient("https://lindat.mff.cuni.cz/services/translation/api/v1");
         //translator = new LindatTranslationClient();
     }

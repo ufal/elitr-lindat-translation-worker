@@ -1,6 +1,10 @@
 package elitr.worker;
 
+import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -68,17 +72,33 @@ public class Worker {
 
         //log.info("Using " + nThreads + " threads");
 
+        Path selfPath = Paths.get(Worker.class.getProtectionDomain().getCodeSource().getLocation().getPath());
+
+        Properties props = new Properties();
+        Path propPath = Paths.get(selfPath.getParent().toAbsolutePath().toString(),"input_fingerprints_mapping.properties");
+        if(Files.exists(propPath)){
+            try {
+                props.load(Files.newBufferedReader(propPath));
+            }catch (IOException e){
+                log.error("Error loading " + propPath.toAbsolutePath(), e);
+            }
+        }else{
+            log.info("Input fingreprints mapping file not found " + propPath.toAbsolutePath());
+        }
+
+
         List<Callable<Void>> callables = new LinkedList<>();
 
         Translator translator = new LindatTranslationClient();
         for (Map.Entry<String, String> entry : translator.getAvailableLanguagePairs()) {
             String src = entry.getKey();
+            String mapped_src = (String)props.getOrDefault(src, src);
             String tgt = entry.getValue();
 
             Callable<Void> callable = () -> {
                 String workerName = String.format("LindatTranslationWorker-%s-%s-%s", InetAddress.getLocalHost().getHostName(),
                                 ProcessHandle.current().pid(), Thread.currentThread().getId());
-                Worker worker = new Worker(workerName, src, tgt);
+                Worker worker = new Worker(workerName, mapped_src, tgt);
                 try{
                     worker.start(host, port);
                 }catch (MCloudException e){

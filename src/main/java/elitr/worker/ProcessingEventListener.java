@@ -63,7 +63,8 @@ public class ProcessingEventListener extends MCloudEventListener {
         log.info("handleData is called for packet " + pkt);
         if(pkt.getType() == MCloudPacket.PacketType.DATA_TEXT){
             MCloudTextPacket textPacket = (MCloudTextPacket) pkt;
-            String translation = translator.translate(textPacket.getText(), textPacket.getFingerPrint(), outputFingerPrint);
+            String translation = translator.translate(textPacket.getText(), textPacket.getFingerPrint()
+                            .replaceAll("-.*", ""), outputFingerPrint);
             log.info("Translation: " + translation);
             //TODO start\time, stopTime, offset?
             MCloudPacket translated = new MCloudTextPacket(textPacket.getStartTime(), textPacket.getStopTime(),

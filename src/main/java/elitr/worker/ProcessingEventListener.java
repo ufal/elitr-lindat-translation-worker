@@ -18,11 +18,13 @@ public class ProcessingEventListener extends MCloudEventListener {
     private final MCloudWorker worker;
     private final String outputFingerPrint;
     private final Translator translator;
+    private final String translatorSrc;
 
-    public ProcessingEventListener(MCloudWorker worker, String outputFingerPrint){
+    public ProcessingEventListener(MCloudWorker worker, String translatorSrc, String outputFingerPrint){
         super();
         this.worker = worker;
         this.outputFingerPrint = outputFingerPrint;
+        this.translatorSrc = translatorSrc;
         //translator = new LindatTranslationClient("https://lindat.mff.cuni.cz/services/translation/api/v1");
         //This uses $API_URL or localhost:5000
         translator = new LindatTranslationClient();
@@ -63,8 +65,7 @@ public class ProcessingEventListener extends MCloudEventListener {
         log.info("handleData is called for packet " + pkt);
         if(pkt.getType() == MCloudPacket.PacketType.DATA_TEXT){
             MCloudTextPacket textPacket = (MCloudTextPacket) pkt;
-            String translation = translator.translate(textPacket.getText(), textPacket.getFingerPrint()
-                            .replaceAll("-.*", ""), outputFingerPrint);
+            String translation = translator.translate(textPacket.getText(), translatorSrc, outputFingerPrint);
             log.info("Translation: " + translation);
             //TODO start\time, stopTime, offset?
             MCloudPacket translated = new MCloudTextPacket(textPacket.getStartTime(), textPacket.getStopTime(),

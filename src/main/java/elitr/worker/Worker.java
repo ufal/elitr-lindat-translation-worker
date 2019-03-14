@@ -36,7 +36,7 @@ public class Worker {
     private MCloudQueue procQueue;
     private MCloudQueue sendQueue;
 
-    public Worker (String name, String inputFingerprint, String outputFingerprint) throws MCloudException {
+    public Worker (String name, String translatorSrcLang, String inputFingerprint, String outputFingerprint) throws MCloudException {
         /*
         Without synchronized this odd thing appears:
         This machine has 4available processors.
@@ -56,7 +56,7 @@ public class Worker {
         procQueue = mWorker.getProcessingQueue();
         sendQueue = mWorker.getSendingQueue();
         log.info("Setting listeners to processing queue and sending queue");
-        ProcessingEventListener manager = new ProcessingEventListener(mWorker, outputFingerprint);
+        ProcessingEventListener manager = new ProcessingEventListener(mWorker, translatorSrcLang, outputFingerprint);
         procQueue.addGlobalListener(manager);
         sendQueue.addGlobalListener(new SendingEventListener(manager));
     }
@@ -98,7 +98,7 @@ public class Worker {
             Callable<Void> callable = () -> {
                 String workerName = String.format("LindatTranslationWorker-%s-%s-%s", InetAddress.getLocalHost().getHostName(),
                                 ProcessHandle.current().pid(), Thread.currentThread().getId());
-                Worker worker = new Worker(workerName, mapped_src, tgt);
+                Worker worker = new Worker(workerName, src, mapped_src, tgt);
                 try{
                     worker.start(host, port);
                 }catch (MCloudException e){

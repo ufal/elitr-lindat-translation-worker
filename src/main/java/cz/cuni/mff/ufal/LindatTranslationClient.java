@@ -70,7 +70,7 @@ public class LindatTranslationClient implements Translator {
             throw new IllegalArgumentException(String.format("Translation from %s to %s is not available",
                     sourceLanguage, targetLanguage));
         }
-        URI uri = URI.create(this.apiUrl + ApiPaths.LANGUAGES + String.format("?src=%s&tgt=%s", sourceLanguage,
+        URI uri = URI.create(this.apiUrl + ApiPaths.LANGUAGES + String.format("/?src=%s&tgt=%s", sourceLanguage,
                 targetLanguage));
         return processInputText(text, uri);
     }
@@ -83,17 +83,35 @@ public class LindatTranslationClient implements Translator {
         return processInputText(text, uri);
     }
 
+    private Set<Map.Entry<String,String>> getLanguagePairs(Map langDef){
+        URI langDefUri = URI.create(this.apiUrl).resolve((String)langDef.get("href"));
+        var lang = fetch(langDefUri);
+        var langName = (String)lang.get("name");
+        var srcArr = processListing(lang, "_links", "sources");
+        var tgtArr = processListing(lang, "_links", "targets");
+
+        var languages = new HashSet<Map.Entry<String, String>>();
+        for(Object otherLangObject : srcArr){
+            var otherName = (String)((Map)otherLangObject).get("name");
+            languages.add(new AbstractMap.SimpleEntry<>(otherName, langName));
+        }
+        for(Object otherLangObject : tgtArr){
+            var otherName = (String)((Map)otherLangObject).get("name");
+            languages.add(new AbstractMap.SimpleEntry<>(langName, otherName));
+        }
+        return languages;
+    }
+
     @Override
     public Set<Map.Entry<String, String>> getAvailableLanguagePairs() {
         if(availableLanguagePairs == null){
             availableLanguagePairs = new HashSet<>();
             URI uri = URI.create(this.apiUrl + ApiPaths.LANGUAGES);
-            var arr = processListing(uri, "_links", "languages");
+            var arr = fetchAndProcessListing(uri, "_links", "item");
             for(Object langObject: arr){
                 Map langDef = (Map)langObject;
-                String source = (String)langDef.get("source");
-                String target = (String)langDef.get("target");
-                availableLanguagePairs.add(new AbstractMap.SimpleEntry<>(source, target));
+                var langs = getLanguagePairs(langDef);
+                availableLanguagePairs.addAll(langs);
             }
         }
         return availableLanguagePairs;
@@ -104,10 +122,10 @@ public class LindatTranslationClient implements Translator {
         if(availableModels == null){
             availableModels = new HashSet<>();
             URI uri = URI.create(this.apiUrl + ApiPaths.MODELS);
-            var arr = processListing(uri, "_links", "models");
+            var arr = fetchAndProcessListing(uri, "_links", "item");
             for(Object langObject: arr){
                 Map langDef = (Map)langObject;
-                String modelName = (String)langDef.get("model");
+                String modelName = (String)langDef.get("name");
                 availableModels.add(modelName);
             }
         }
@@ -144,26 +162,38 @@ public class LindatTranslationClient implements Translator {
         return "";
     }
 
-    private List<Object> processListing(URI uri, String firstKey, String secondKey){
+    private Map fetch(URI uri){
         HttpRequest request = HttpRequest.newBuilder()
                 .GET()
                 .uri(uri)
                 .setHeader("Accept", "application/json")
                 .timeout(Duration.ofSeconds(30))
                 .build();
-        HttpResponse<InputStream> response = null;
+        HttpResponse<InputStream> response;
         try {
             response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            Map result = json.deserialize(Map.class, response.body(), new byte[1024]);
-            var linksObject = (Map) result.get(firstKey);
-            return (List) linksObject.get(secondKey);
+            return json.deserialize(Map.class, response.body(), new byte[1024]);
         }catch (InterruptedException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return new HashMap();
 
-        return new ArrayList<>();
+    }
+
+    private List<Object> processListing(Map result, String firstKey, String secondKey){
+        if(!result.isEmpty()) {
+            var linksObject = (Map) result.get(firstKey);
+            return (List) linksObject.get(secondKey);
+        }else {
+            return new ArrayList<>();
+        }
+    }
+
+    private List<Object> fetchAndProcessListing(URI uri, String firstKey, String secondKey){
+        var result = fetch(uri);
+        return processListing(result, firstKey, secondKey);
     }
 
     private boolean validLangParams(String source, String target){

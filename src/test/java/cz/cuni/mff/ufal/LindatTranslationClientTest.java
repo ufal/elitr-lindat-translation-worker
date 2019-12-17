@@ -11,7 +11,7 @@ public class LindatTranslationClientTest {
 
     @BeforeClass
     public static void beforeInit(){
-        translator = new LindatTranslationClient("https://lindat.mff.cuni.cz/services/translation/api/v1");
+        translator = new LindatTranslationClient("https://lindat.mff.cuni.cz/services/translation/api/v2");
         //translator = new LindatTranslationClient();
     }
 
@@ -34,5 +34,11 @@ public class LindatTranslationClientTest {
     @Test
     public void getAvailableModels() {
         assertFalse(translator.getAvailableModels().isEmpty());
+    }
+
+    @Test
+    public void translateWithModel() {
+        assertTrue(translator.translate("This is a simple test.", "en-cs")
+                .startsWith("Tohle je jednoduchý test."));
     }
 }
